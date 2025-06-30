@@ -10,7 +10,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 
-	"netspire-go/internal/models"
+	"isp-billing/internal/models"
 )
 
 type PostgreSQL struct {

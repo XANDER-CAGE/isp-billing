@@ -3,8 +3,8 @@ package billing
 import (
 	"fmt"
 
-	"netspire-go/internal/database"
-	"netspire-go/internal/models"
+	"isp-billing/internal/database"
+	"isp-billing/internal/models"
 )
 
 type Service struct {

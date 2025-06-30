@@ -1,4 +1,4 @@
-module netspire-go
+module isp-billing
 
 go 1.19
 
