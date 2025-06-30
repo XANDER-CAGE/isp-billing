@@ -106,7 +106,7 @@ func (h *AdminHandler) GetStats(c *gin.Context) {
 
 // GetAccount - получить информацию об аккаунте
 func (h *AdminHandler) GetAccount(c *gin.Context) {
-	login := c.Param("login")
+	login := c.Param("id")
 
 	account, err := h.db.FetchAccount(login)
 	if err != nil {
