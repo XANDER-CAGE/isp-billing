@@ -63,6 +63,8 @@ func (p *PostgreSQL) GetDB() *sql.DB {
 
 // FetchAccount - точная копия fetch_account из mod_iptraffic_pgsql.erl
 func (p *PostgreSQL) FetchAccount(userName string) (*models.AccountWithRelations, error) {
+	logrus.Infof("FetchAccount called with userName: %s", userName)
+
 	var account models.AccountWithRelations
 
 	err := p.db.QueryRow(models.FetchAccountQuery, userName).Scan(
@@ -79,11 +81,14 @@ func (p *PostgreSQL) FetchAccount(userName string) (*models.AccountWithRelations
 
 	if err != nil {
 		if err == sql.ErrNoRows {
+			logrus.Infof("No account found for userName: %s", userName)
 			return nil, nil // Возвращаем nil как в Erlang коде (undefined)
 		}
+		logrus.Errorf("Error scanning account for userName %s: %v", userName, err)
 		return nil, fmt.Errorf("failed to fetch account: %w", err)
 	}
 
+	logrus.Infof("Account found for userName %s: ID=%d, Balance=%.2f", userName, account.ID, account.Balance)
 	return &account, nil
 }
 

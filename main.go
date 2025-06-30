@@ -31,12 +31,12 @@ func main() {
 
 	// Initialize database
 	dbConfig := database.Config{
-		Host:     "localhost",
-		Port:     5432,
-		Name:     "netspire",
-		User:     "netspire",
-		Password: "password",
-		SSLMode:  "disable",
+		Host:     getEnv("DB_HOST", "localhost"),
+		Port:     getEnvInt("DB_PORT", 5432),
+		Name:     getEnv("DB_NAME", "netspire"),
+		User:     getEnv("DB_USER", "netspire"),
+		Password: getEnv("DB_PASSWORD", "password"),
+		SSLMode:  getEnv("DB_SSLMODE", "disable"),
 	}
 
 	db, err := database.NewPostgreSQL(dbConfig)
