@@ -1,0 +1,113 @@
+# Netspire IP Pool REST API module for FreeRADIUS
+# Equivalent to mod_ippool.erl hooks functionality
+
+rest netspire_ippool {
+    # Connection settings
+    connect_uri = "http://localhost:8080"
+    connect_timeout = 3.0
+    
+    # Pool settings
+    pool {
+        start = 10
+        min = 5
+        max = 20
+        spare = 3
+        uses = 0
+        lifetime = 0
+        retry_delay = 30
+        connect_timeout = 3.0
+    }
+
+    # Lease IP endpoint - called during authorization
+    lease {
+        uri = "${..connect_uri}/api/v1/ippool/lease"
+        method = 'post'
+        
+        # Send lease request
+        body = 'json'
+        data = '{
+            "pool": "%{reply:Netspire-Framed-Pool}",
+            "username": "%{User-Name}",
+            "sid": "%{Acct-Session-Id}"
+        }'
+        
+        # Handle response
+        auth = 'none'
+        timeout = 3.0
+        
+        # Parse JSON response and add Framed-IP-Address if success
+        update {
+            reply:Framed-IP-Address := "%{jsonquote:%{rest:ip}}"
+        }
+        
+        # Only add IP if lease was successful
+        if ("%{rest:success}" == "true") {
+            update reply {
+                Framed-IP-Address := "%{jsonquote:%{rest:ip}}"
+            }
+        }
+        else {
+            reject
+        }
+    }
+    
+    # Renew IP endpoint - called during interim updates  
+    renew {
+        uri = "${..connect_uri}/api/v1/ippool/renew"
+        method = 'post'
+        
+        body = 'json'
+        data = '{
+            "ip": "%{Framed-IP-Address}",
+            "username": "%{User-Name}",
+            "sid": "%{Acct-Session-Id}"
+        }'
+        
+        auth = 'none'
+        timeout = 3.0
+    }
+    
+    # Release IP endpoint - called when session ends
+    release {
+        uri = "${..connect_uri}/api/v1/ippool/release"
+        method = 'post'
+        
+        body = 'json'
+        data = '{
+            "ip": "%{Framed-IP-Address}",
+            "username": "%{User-Name}",
+            "sid": "%{Acct-Session-Id}"
+        }'
+        
+        auth = 'none'
+        timeout = 3.0
+    }
+}
+
+# Policy for IP pool operations
+policy {
+    # Lease IP during authorization
+    netspire_ippool_lease {
+        # Only lease IP if not already present and user is accepted
+        if (!&reply:Framed-IP-Address) {
+            rest.netspire_ippool.lease
+            if (fail || notfound) {
+                reject
+            }
+        }
+    }
+    
+    # Renew IP during interim accounting
+    netspire_ippool_renew {
+        if (&Framed-IP-Address) {
+            rest.netspire_ippool.renew
+        }
+    }
+    
+    # Release IP when session ends
+    netspire_ippool_release {
+        if (&Framed-IP-Address) {
+            rest.netspire_ippool.release
+        }
+    }
+} 

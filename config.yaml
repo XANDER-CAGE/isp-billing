@@ -1,0 +1,239 @@
+# Netspire Go Billing Service Configuration
+# ВАЖНО: Сохраняет всю существующую структуру БД без изменений
+
+# PostgreSQL Database - СУЩЕСТВУЮЩАЯ БД (без изменений!)
+database:
+  host: "192.168.167.7"      # Существующий хост
+  port: 5432
+  name: "netspire"           # Существующая БД
+  user: "netspire"
+  password: "netspire_password"
+  sslmode: "disable"
+  max_connections: 25
+  max_idle_connections: 5
+
+# Redis для кеширования сессий (заменяет Mnesia)
+redis:
+  host: "localhost"
+  port: 6379
+  password: ""
+  db: 0
+  max_retries: 3
+  pool_size: 10
+
+# HTTP Server для FreeRADIUS интеграции
+server:
+  host: "0.0.0.0"
+  port: 8080
+  timeout: 30s
+  max_header_bytes: 1048576
+  read_timeout: 30s
+  write_timeout: 30s
+
+# Billing Configuration (алгоритмы как в Erlang)
+billing:
+  algorithms:
+    # Предоплатная авторизация (точно как в algo_builtin.erl)
+    prepaid_auth:
+      cost_per_mb: 0.01      # Стоимость за MB
+      overlimit_cost: 0.05   # Стоимость при превышении
+      min_balance: 0.0       # Минимальный баланс
+      
+    # Ограниченная предоплата  
+    limited_prepaid_auth:
+      cost_per_mb: 0.01
+      session_limit: 100.0   # Лимит сессии
+      overlimit_action: "disconnect"
+      
+    # Авторизация при входе
+    on_auth:
+      session_cost: 5.0      # Стоимость сессии
+      
+    # Без превышения лимита
+    no_overlimit_auth:
+      cost_per_mb: 0.01
+      strict_limit: true
+
+  # Классы трафика (как в tclass.erl)
+  traffic_classes:
+    default:
+      name: "default"
+      cost_in: 0.01
+      cost_out: 0.01
+    premium:
+      name: "premium"  
+      cost_in: 0.02
+      cost_out: 0.02
+    local:
+      name: "local"
+      cost_in: 0.005
+      cost_out: 0.005
+
+# NetFlow Configuration (сохраняется как в Erlang)
+netflow:
+  enabled: true
+  listen_address: "0.0.0.0:2055"
+  buffer_size: 65536
+  workers: 4
+  
+  # NetFlow v5/v9 support (как в оригинале)
+  versions:
+    - 5
+    - 9
+  
+  # Классификация трафика (как в существующей системе)
+  classification:
+    enable_geo_ip: false
+    default_class: "default"
+
+# IP Pool Management (заменяет mod_ippool.erl)
+ippool:
+  enabled: true
+  timeout: 300                      # Таймаут аренды IP в секундах (как в Erlang ?TIMEOUT)
+  default_pool: "main"              # Пул по умолчанию
+  use_another_one_free_pool: true   # Использовать другие пулы если основной занят
+  allocate: true                    # Очистить и переинициализировать пулы при старте
+  
+  # Пулы IP адресов (точно как в конфиге Erlang mod_ippool)
+  pools:
+    - name: "main"
+      ranges:
+        - "192.168.100.10-192.168.100.254"
+        - "192.168.101.0/24"
+    - name: "guest"  
+      ranges:
+        - "10.10.10.10-10.10.10.100"
+    - name: "premium"
+      ranges:
+        - "172.16.0.0/24"
+
+# Session Management (заменяет Mnesia сессии и iptraffic_session.erl)
+session:
+  session_timeout: 3600           # Таймаут сессии в секундах (1 час)
+  sync_interval: 30               # Синхронизация с БД каждые 30 секунд
+  delay_stop: 5                   # Задержка перед остановкой сессии (как в Erlang)
+  disconnect_on_shutdown: true    # Отключать клиентов при завершении работы
+  max_sessions: 10000             # Максимум одновременных сессий
+  cleanup_interval: 60            # Интервал очистки expired сессий
+  max_sessions_per_user: 1        # Максимум сессий на пользователя
+
+# Disconnect Management (заменяет mod_disconnect_pod.erl и mod_disconnect_script.erl)
+disconnect:
+  enabled: true
+  
+  # RADIUS Disconnect-Request (mod_disconnect_pod.erl)
+  radius_enabled: true              # Включить RADIUS Disconnect-Request (RFC 3576)
+  secret: "testing123"              # Shared secret для аутентификации пакетов
+  nas_timeout: 5s                   # Таймаут ответа от NAS
+  retries: 3                        # Количество попыток отправки
+  
+  # Script-based disconnect (mod_disconnect_script.erl)
+  script_enabled: false             # Включить отключение через внешние скрипты
+  script_path: "/usr/local/bin/disconnect.sh"  # Путь к скрипту отключения
+  script_timeout: 10s               # Таймаут выполнения скрипта
+  script_env:                       # Переменные окружения для скрипта
+    - "NETSPIRE_ENV=production"
+    
+  # PoD (Packet of Death) disconnect (кастомная реализация)
+  pod_enabled: false                # Включить отключение через PoD пакеты
+  pod_endpoint: "192.168.1.1:4000"  # UDP endpoint для PoD пакетов
+  pod_timeout: 3s                   # Таймаут отправки PoD пакета
+
+# Traffic Classification (заменяет tclass.erl)
+traffic_classification:
+  enabled: true                     # Включить классификацию трафика
+  config_file: "tclass.yaml"        # Путь к конфигурационному файлу
+  default_class: "internet"         # Класс по умолчанию
+  reload_on_change: false           # Автоматическая перезагрузка при изменении файла
+  
+  # Встроенные классы трафика (если config_file не задан)
+  builtin_classes:
+    - name: "local"
+      networks:
+        - "192.168.0.0/16"
+        - "10.0.0.0/8"  
+        - "172.16.0.0/12"
+      priority: 1
+      cost_in: 0.005
+      cost_out: 0.005
+      
+    - name: "internet"
+      networks:
+        - "0.0.0.0/0"
+      priority: 99
+      cost_in: 0.015
+      cost_out: 0.018
+
+# Logging
+logging:
+  level: "info"
+  format: "json"
+  output: "stdout"
+  
+  # Логи для совместимости с Erlang системой
+  erlang_compat:
+    session_events: true
+    billing_events: true
+    netflow_events: true
+
+# Monitoring
+monitoring:
+  enabled: true
+  metrics_endpoint: "/metrics"
+  health_endpoint: "/health"
+  
+  # Совместимость с существующим мониторингом
+  stats:
+    update_interval: "30s"
+    session_stats: true
+    billing_stats: true
+    
+# Security
+security:
+  # Аутентификация для админ API
+  admin_auth:
+    enabled: true
+    username: "admin"
+    password: "admin_password"
+    
+  # RADIUS shared secrets (как в существующей системе)
+  radius_secrets:
+    default: "testing123"
+    
+# Cache settings (Redis заменяет Mnesia)
+cache:
+  session_ttl: "24h"         # TTL для сессий
+  account_ttl: "1h"          # TTL для аккаунтов  
+  plan_ttl: "4h"             # TTL для планов
+  prefix: "netspire:"        # Префикс ключей
+
+# Integration with existing Erlang system
+erlang_compat:
+  # Формат данных совместимый с Erlang
+  plan_data_format: "json_string"    # JSON в VARCHAR поле
+  session_format: "erlang_record"    # Формат как в Erlang
+  
+  # Поддержка существующих алгоритмов
+  algo_modules:
+    - "algo_builtin"
+    - "custom_algo"
+    
+  # Миграция данных
+  migration:
+    preserve_sessions: true         # Сохранить активные сессии  
+    preserve_balances: true         # Сохранить балансы
+    validate_schema: true           # Проверить схему БД
+
+# Performance
+performance:
+  max_concurrent_sessions: 10000
+  session_sync_interval: "30s"
+  billing_batch_size: 100
+  db_connection_timeout: "30s"
+  
+# Development/Debug
+debug:
+  enabled: false
+  log_sql_queries: false
+  log_radius_packets: false
+  profile_endpoints: false 

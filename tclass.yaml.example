@@ -1,0 +1,113 @@
+# Traffic Classification Configuration
+# Equivalent to tariffs.conf.sample from netspire-iptraffic
+
+classes:
+  # Local networks - low cost
+  - name: "local"
+    networks:
+      - "192.168.0.0/16"
+      - "10.0.0.0/8"
+      - "172.16.0.0/12"
+    priority: 1
+    cost_in: 0.005   # Cost per MB incoming
+    cost_out: 0.005  # Cost per MB outgoing
+
+  # Corporate networks
+  - name: "corporate"
+    networks:
+      - "198.51.100.0/24"
+      - "203.0.113.0/24"
+    priority: 2
+    cost_in: 0.008
+    cost_out: 0.008
+
+  # Regional ISPs - medium cost
+  - name: "regional"
+    networks:
+      - "95.160.0.0/11"
+      - "46.16.0.0/12"
+      - "213.180.0.0/14"
+    priority: 3
+    cost_in: 0.012
+    cost_out: 0.015
+
+  # Popular services - optimized cost
+  - name: "google"
+    networks:
+      - "8.8.8.0/24"
+      - "8.8.4.0/24"
+      - "74.125.0.0/16"
+      - "108.177.0.0/16"
+    priority: 4
+    cost_in: 0.009
+    cost_out: 0.011
+
+  - name: "cloudflare"
+    networks:
+      - "1.1.1.0/24"
+      - "104.16.0.0/12"
+      - "172.64.0.0/13"
+    priority: 5
+    cost_in: 0.009
+    cost_out: 0.011
+
+  # Social media - higher cost
+  - name: "social"
+    networks:
+      - "31.13.24.0/21"    # Facebook
+      - "179.60.192.0/22"  # Facebook
+      - "185.60.216.0/22"  # Facebook
+    priority: 6
+    cost_in: 0.018
+    cost_out: 0.020
+
+  # Video streaming - premium cost
+  - name: "video"
+    networks:
+      - "208.65.152.0/22"  # YouTube
+      - "208.117.224.0/19" # YouTube
+      - "52.84.0.0/15"     # Netflix
+      - "54.240.0.0/12"    # Netflix
+    priority: 7
+    cost_in: 0.025
+    cost_out: 0.030
+
+  # Gaming networks
+  - name: "gaming"
+    networks:
+      - "192.69.96.0/22"   # Steam
+      - "208.78.164.0/22"  # Steam
+      - "185.25.182.0/24"  # Steam
+    priority: 8
+    cost_in: 0.015
+    cost_out: 0.015
+
+  # Mobile operators
+  - name: "mobile"
+    networks:
+      - "95.162.0.0/15"
+      - "217.118.0.0/15"
+      - "46.36.200.0/21"
+    priority: 9
+    cost_in: 0.020
+    cost_out: 0.025
+
+  # International transit - high cost
+  - name: "international"
+    networks:
+      - "1.0.0.0/8"
+      - "2.0.0.0/7"
+      - "4.0.0.0/6"
+      - "11.0.0.0/8"
+      - "12.0.0.0/6"
+    priority: 10
+    cost_in: 0.030
+    cost_out: 0.035
+
+  # Default catch-all - medium cost
+  - name: "internet"
+    networks:
+      - "0.0.0.0/0"
+    priority: 99  # Lowest priority (catch-all)
+    cost_in: 0.015
+    cost_out: 0.018 

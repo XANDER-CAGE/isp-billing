@@ -1,0 +1,60 @@
+rest netspire_rest {
+	# URI to which HTTP requests are sent
+	uri = "http://localhost:8080/api/v1"
+	
+	# Default HTTP method for requests
+	method = 'post'
+	
+	# Body format (can be 'none', 'post', 'json', 'xml')
+	body = 'json'
+	
+	# Connection and response timeouts  
+	connect_timeout = 3.0
+	timeout = 10.0
+	
+	# Authorization
+	authorize {
+		uri = "${..uri}/radius/authorize"
+		method = 'post'
+		body = 'json'
+		data = '{"User-Name": "%{User-Name}", "User-Password": "%{User-Password}", "NAS-Identifier": "%{NAS-Identifier}", "NAS-IP-Address": "%{NAS-IP-Address}", "Service-Type": "%{Service-Type}", "Called-Station-Id": "%{Called-Station-Id}", "Calling-Station-Id": "%{Calling-Station-Id}"}'
+		
+		# Map JSON response to RADIUS attributes
+		map {
+			&control:Response-Packet-Type = "%{rest:decision}"
+		}
+	}
+	
+	# Accounting
+	accounting {
+		uri = "${..uri}/radius/accounting"
+		method = 'post'
+		body = 'json'
+		data = '{"User-Name": "%{User-Name}", "Acct-Status-Type": "%{Acct-Status-Type}", "Acct-Session-Id": "%{Acct-Session-Id}", "Calling-Station-Id": "%{Calling-Station-Id}", "Framed-IP-Address": "%{Framed-IP-Address}", "Acct-Input-Octets": "%{Acct-Input-Octets}", "Acct-Output-Octets": "%{Acct-Output-Octets}", "Acct-Session-Time": "%{Acct-Session-Time}", "NAS-Identifier": "%{NAS-Identifier}", "NAS-IP-Address": "%{NAS-IP-Address}"}'
+	}
+	
+	# Post-authentication
+	post-auth {
+		uri = "${..uri}/radius/post-auth"
+		method = 'post'
+		body = 'json'
+		data = '{"User-Name": "%{User-Name}", "reply": "%{reply:*}", "request": "%{request:*}"}'
+	}
+	
+	# Connection pool settings
+	pool {
+		start = 5
+		min = 4
+		max = 10
+		spare = 3
+		uses = 0
+		lifetime = 0
+		cleanup_interval = 30
+		idle_timeout = 60
+		retry_delay = 1
+		spread = yes
+	}
+	
+	# Connection options
+	connect_uri = "http://localhost:8080"
+} 

@@ -1,0 +1,143 @@
+rest netspire_rest {
+	# URI to which HTTP requests are sent
+	uri = "http://localhost:8080/api/v1"
+	
+	# Default HTTP method for requests
+	method = 'post'
+	
+	# Body format (can be 'none', 'post', 'json', 'xml')
+	body = 'json'
+	
+	# Connection and response timeouts  
+	connect_timeout = 3.0
+	timeout = 10.0
+	
+	# Authorization - Enhanced with all auth methods
+	authorize {
+		uri = "${..uri}/radius/authorize"
+		method = 'post'
+		body = 'json'
+		
+		# Enhanced data with all RADIUS attributes for full authentication support
+		data = '{
+			"username": "%{User-Name}",
+			"password": "%{User-Password}",
+			"nas_ip_address": "%{NAS-IP-Address}",
+			"nas_port": "%{NAS-Port}",
+			"nas_port_type": "%{NAS-Port-Type}",
+			"service_type": "%{Service-Type}",
+			"calling_station_id": "%{Calling-Station-Id}",
+			"called_station_id": "%{Called-Station-Id}",
+			"auth_type": "%{Auth-Type}",
+			"attributes": {
+				"CHAP-Password": "%{CHAP-Password}",
+				"CHAP-Challenge": "%{CHAP-Challenge}",
+				"MS-CHAP-Challenge": "%{MS-CHAP-Challenge}",
+				"MS-CHAP2-Response": "%{MS-CHAP2-Response}",
+				"EAP-Message": "%{EAP-Message}",
+				"State": "%{State}",
+				"NAS-Identifier": "%{NAS-Identifier}",
+				"Framed-Protocol": "%{Framed-Protocol}",
+				"Connect-Info": "%{Connect-Info}"
+			}
+		}'
+		
+		# Map JSON response to RADIUS attributes
+		map {
+			&control:Response-Packet-Type = "%{rest:result}"
+			&reply:Cleartext-Password = "%{rest:attributes.Cleartext-Password}"
+			&reply:Service-Type = "%{rest:attributes.Service-Type}"
+			&reply:Framed-Protocol = "%{rest:attributes.Framed-Protocol}"
+			&reply:Pool-Name = "%{rest:attributes.Pool-Name}"
+			&reply:Download-Speed = "%{rest:attributes.Download-Speed}"
+			&reply:Upload-Speed = "%{rest:attributes.Upload-Speed}"
+		}
+	}
+	
+	# Accounting - Enhanced with detailed session data
+	accounting {
+		uri = "${..uri}/radius/accounting"
+		method = 'post'
+		body = 'json'
+		
+		data = '{
+			"username": "%{User-Name}",
+			"session_id": "%{Acct-Session-Id}",
+			"nas_ip_address": "%{NAS-IP-Address}",
+			"nas_port": "%{NAS-Port}",
+			"framed_ip_address": "%{Framed-IP-Address}",
+			"acct_status_type": "%{Acct-Status-Type}",
+			"acct_input_octets": "%{Acct-Input-Octets}",
+			"acct_output_octets": "%{Acct-Output-Octets}",
+			"acct_session_time": "%{Acct-Session-Time}",
+			"acct_terminate_cause": "%{Acct-Terminate-Cause}",
+			"calling_station_id": "%{Calling-Station-Id}",
+			"called_station_id": "%{Called-Station-Id}",
+			"attributes": {
+				"NAS-Identifier": "%{NAS-Identifier}",
+				"NAS-Port-Type": "%{NAS-Port-Type}",
+				"Service-Type": "%{Service-Type}",
+				"Framed-Protocol": "%{Framed-Protocol}",
+				"Connect-Info": "%{Connect-Info}",
+				"Acct-Input-Packets": "%{Acct-Input-Packets}",
+				"Acct-Output-Packets": "%{Acct-Output-Packets}",
+				"Event-Timestamp": "%{Event-Timestamp}"
+			}
+		}'
+	}
+	
+	# Post-authentication - Session setup and IP pool assignment
+	post-auth {
+		uri = "${..uri}/radius/post-auth"
+		method = 'post'
+		body = 'json'
+		
+		data = '{
+			"username": "%{User-Name}",
+			"nas_ip_address": "%{NAS-IP-Address}",
+			"auth_type": "%{Auth-Type}",
+			"session_id": "%{Acct-Session-Id}",
+			"framed_ip_address": "%{Framed-IP-Address}",
+			"attributes": {
+				"NAS-Identifier": "%{NAS-Identifier}",
+				"Service-Type": "%{Service-Type}",
+				"Pool-Name": "%{Pool-Name}",
+				"Reply-Message": "%{reply:Reply-Message}"
+			}
+		}'
+		
+		# Map response for IP pool assignment
+		map {
+			&reply:Framed-IP-Address = "%{rest:attributes.Framed-IP-Address}"
+			&reply:Framed-Netmask = "%{rest:attributes.Framed-Netmask}"
+			&reply:Framed-Route = "%{rest:attributes.Framed-Route}"
+		}
+	}
+	
+	# Connection pool settings - Optimized for production
+	pool {
+		start = 5
+		min = 4
+		max = 20
+		spare = 3
+		uses = 0
+		lifetime = 0
+		cleanup_interval = 30
+		idle_timeout = 60
+		retry_delay = 1
+		spread = yes
+	}
+	
+	# Connection options
+	connect_uri = "http://localhost:8080"
+	
+	# Failover and reliability
+	max_redirects = 0
+	
+	# TLS settings (if needed)
+	tls {
+		# ca_file = "/etc/ssl/certs/ca-certificates.crt"
+		# check_cert = yes
+		# check_cert_cn = yes
+	}
+} 

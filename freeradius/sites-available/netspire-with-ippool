@@ -1,0 +1,182 @@
+# Netspire FreeRADIUS Virtual Server with IP Pool Support
+# Full equivalent to Erlang netspire.conf functionality
+
+server netspire {
+    # RADIUS Authentication (port 1812)
+    listen {
+        type = auth
+        ipaddr = *
+        port = 1812
+        limit {
+            max_connections = 1000
+            lifetime = 0
+            idle_timeout = 30
+        }
+    }
+
+    # RADIUS Accounting (port 1813) 
+    listen {
+        type = acct
+        ipaddr = *
+        port = 1813
+        limit {
+            max_connections = 1000
+            lifetime = 0
+            idle_timeout = 30
+        }
+    }
+
+    # Authorization flow
+    authorize {
+        # Netspire billing authorization
+        rest.netspire_rest.authorize
+        
+        # If authorization passed, lease IP from pool
+        if (ok) {
+            # Lease IP from Netspire IP pool
+            netspire_ippool_lease
+        }
+        
+        # Standard modules
+        preprocess
+        suffix
+        
+        # Update reply with leased IP
+        update reply {
+            # IP is set by netspire_ippool_lease policy
+        }
+    }
+
+    # Authentication methods (handled by FreeRADIUS)
+    authenticate {
+        Auth-Type PAP {
+            pap
+        }
+        Auth-Type CHAP {
+            chap
+        }
+        Auth-Type MS-CHAP {
+            mschap
+        }
+        Auth-Type EAP {
+            eap
+        }
+    }
+
+    # Pre-accounting processing
+    preacct {
+        preprocess
+        acct_unique
+        suffix
+    }
+
+    # Accounting
+    accounting {
+        # Handle different accounting types
+        switch &Acct-Status-Type {
+            case Start {
+                # Session start - already have IP from authorization
+                rest.netspire_rest.accounting
+            }
+            
+            case Interim-Update {
+                # Renew IP lease on interim updates
+                netspire_ippool_renew
+                rest.netspire_rest.accounting
+            }
+            
+            case Stop {
+                # Session stop - release IP and do accounting
+                rest.netspire_rest.accounting
+                netspire_ippool_release
+            }
+            
+            case {
+                # Other accounting types
+                rest.netspire_rest.accounting
+            }
+        }
+    }
+
+    # Post-auth processing
+    post-auth {
+        # Call Netspire post-auth
+        rest.netspire_rest.post_auth
+        
+        # Remove sensitive information from logs
+        remove_reply_message_if_eap
+    }
+
+    # Pre-proxy (if needed for load balancing)
+    pre-proxy {
+        # Nothing for now
+    }
+
+    # Post-proxy
+    post-proxy {
+        # Nothing for now 
+    }
+}
+
+# Policies for IP pool operations
+policy {
+    # Lease IP from Netspire pool
+    netspire_ippool_lease {
+        # Only lease if no IP already assigned
+        if (!&reply:Framed-IP-Address) {
+            rest.netspire_ippool.lease
+            
+            # Check if lease was successful
+            if ("%{rest:success}" == "true") {
+                update reply {
+                    Framed-IP-Address := "%{rest:ip}"
+                }
+            }
+            else {
+                # No available IPs
+                reject
+            }
+        }
+    }
+    
+    # Renew IP lease 
+    netspire_ippool_renew {
+        if (&Framed-IP-Address) {
+            rest.netspire_ippool.renew
+        }
+    }
+    
+    # Release IP back to pool
+    netspire_ippool_release {
+        if (&Framed-IP-Address) {
+            rest.netspire_ippool.release
+        }
+    }
+}
+
+# Client definitions (NAS devices)
+client nas1 {
+    ipaddr = 192.168.1.0/24
+    secret = shared_secret_key
+    shortname = nas1
+    nastype = cisco
+    
+    # Virtual server for this client
+    virtual_server = netspire
+}
+
+client nas2 {
+    ipaddr = 10.0.0.0/8  
+    secret = another_secret
+    shortname = nas2
+    nastype = mikrotik
+    virtual_server = netspire
+}
+
+client localhost {
+    ipaddr = 127.0.0.1
+    secret = testing123
+    shortname = localhost
+    nastype = other
+    virtual_server = netspire
+} 
