@@ -61,20 +61,20 @@ func main() {
 	}
 
 	// Initialize services
-	billingService := billing.New(db, logger)
+	billingService := billing.NewService(db, map[string]interface{}{})
 
-	sessionService := session.New(db, logger, session.Config{
-		NetFlowPort: 2055,
+	ippoolService := ippool.New(rdb, logger, ippool.Config{})
+
+	disconnectService := disconnect.New(logger, disconnect.Config{
+		RADIUSEnabled: true,
+		Secret:        "secret",
+		ScriptEnabled: true,
+		ScriptPath:    "/opt/billing/scripts",
 	})
 
-	ippoolService := ippool.New(rdb, logger, ippool.Config{
-		RedisPrefix: "ippool:",
-	})
-
-	disconnectService := disconnect.New(db, logger, disconnect.Config{
-		CoAPort:    3799,
-		CoASecret:  "secret",
-		ScriptPath: "/opt/billing/scripts",
+	sessionService := session.New(rdb, db, billingService, ippoolService, disconnectService, logger, session.Config{
+		SessionTimeout: 3600,
+		SyncInterval:   30,
 	})
 
 	tclassService := tclass.New(logger, tclass.Config{
@@ -82,7 +82,7 @@ func main() {
 	})
 
 	// Initialize handlers
-	adminHandler := handlers.NewAdminHandler(billingService, logger)
+	adminHandler := handlers.NewAdminHandler(db)
 	sessionHandler := handlers.NewSessionHandler(sessionService, logger)
 	ippoolHandler := handlers.NewIPPoolHandler(ippoolService, logger)
 	disconnectHandler := handlers.NewDisconnectHandler(disconnectService, logger)
@@ -108,24 +108,23 @@ func main() {
 
 		// Session routes
 		api.POST("/session/start", sessionHandler.StartSession)
-		api.POST("/session/update", sessionHandler.UpdateSession)
+		api.POST("/session/update", sessionHandler.InterimUpdate)
 		api.POST("/session/stop", sessionHandler.StopSession)
 		api.GET("/session/:id", sessionHandler.GetSession)
 
 		// IP Pool routes
 		api.POST("/ippool/lease", ippoolHandler.LeaseIP)
-		api.POST("/ippool/renew", ippoolHandler.RenewLease)
-		api.POST("/ippool/release", ippoolHandler.ReleaseLease)
-		api.GET("/ippool/status", ippoolHandler.GetPoolStatus)
+		api.POST("/ippool/renew", ippoolHandler.RenewIP)
+		api.POST("/ippool/release", ippoolHandler.ReleaseIP)
+		api.GET("/ippool/info", ippoolHandler.GetPoolInfo)
 
 		// Disconnect routes
-		api.POST("/disconnect/coa", disconnectHandler.DisconnectCoA)
-		api.POST("/disconnect/script", disconnectHandler.DisconnectScript)
-		api.POST("/disconnect/pod", disconnectHandler.DisconnectPOD)
+		api.POST("/disconnect/session", disconnectHandler.DisconnectSession)
+		api.POST("/disconnect/ip", disconnectHandler.DisconnectByIP)
 
 		// Traffic Classification routes
-		api.POST("/tclass/classify", tclassHandler.ClassifyTraffic)
-		api.GET("/tclass/config", tclassHandler.GetConfig)
+		api.GET("/tclass/classify/:ip", tclassHandler.ClassifyIP)
+		api.GET("/tclass/classes", tclassHandler.GetAllClasses)
 		api.POST("/tclass/reload", tclassHandler.ReloadConfig)
 	}
 

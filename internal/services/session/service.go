@@ -8,11 +8,11 @@ import (
 	"sync"
 	"time"
 
-	"netspire-go/internal/database"
-	"netspire-go/internal/models"
-	"netspire-go/internal/services/billing"
-	"netspire-go/internal/services/disconnect"
-	"netspire-go/internal/services/ippool"
+	"isp-billing/internal/database"
+	"isp-billing/internal/models"
+	"isp-billing/internal/services/billing"
+	"isp-billing/internal/services/disconnect"
+	"isp-billing/internal/services/ippool"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"

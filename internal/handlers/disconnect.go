@@ -4,7 +4,7 @@ import (
 	"net"
 	"net/http"
 
-	"netspire-go/internal/services/disconnect"
+	"isp-billing/internal/services/disconnect"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"

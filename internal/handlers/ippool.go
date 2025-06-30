@@ -4,8 +4,8 @@ import (
 	"net"
 	"net/http"
 
-	"netspire-go/internal/models"
-	"netspire-go/internal/services/ippool"
+	"isp-billing/internal/models"
+	"isp-billing/internal/services/ippool"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"

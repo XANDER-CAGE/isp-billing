@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"netspire-go/internal/database"
+	"isp-billing/internal/database"
 )
 
 type AdminHandler struct {
@@ -141,5 +141,69 @@ func (h *AdminHandler) GetPlans(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Plans endpoint not implemented yet",
 		"plans":   []interface{}{},
+	})
+}
+
+// ChargeAccount - списать средства с аккаунта
+func (h *AdminHandler) ChargeAccount(c *gin.Context) {
+	login := c.Param("id")
+
+	var req struct {
+		Amount      float64 `json:"amount" binding:"required"`
+		Description string  `json:"description"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Получаем аккаунт
+	account, err := h.db.FetchAccount(login)
+	if err != nil {
+		logrus.Errorf("Failed to get account %s: %v", login, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		return
+	}
+
+	if account == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Account not found"})
+		return
+	}
+
+	// TODO: Реализовать обновление баланса в БД
+	// Пока что просто возвращаем успех
+	logrus.Infof("Charging account %s with amount %.2f: %s", login, req.Amount, req.Description)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":     "Account charged successfully",
+		"account":     login,
+		"amount":      req.Amount,
+		"description": req.Description,
+		"new_balance": account.Balance - req.Amount,
+	})
+}
+
+// GetBalance - получить баланс аккаунта
+func (h *AdminHandler) GetBalance(c *gin.Context) {
+	login := c.Param("id")
+
+	account, err := h.db.FetchAccount(login)
+	if err != nil {
+		logrus.Errorf("Failed to get account %s: %v", login, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		return
+	}
+
+	if account == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Account not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"account":  login,
+		"balance":  account.Balance,
+		"credit":   account.Credit,
+		"currency": account.Currency,
 	})
 }

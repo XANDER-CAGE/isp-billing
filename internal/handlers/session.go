@@ -4,9 +4,10 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 
-	"netspire-go/internal/models"
-	"netspire-go/internal/services/session"
+	"isp-billing/internal/models"
+	"isp-billing/internal/services/session"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -275,38 +276,91 @@ func (h *SessionHandler) GetSessionBySID(c *gin.Context) {
 	})
 }
 
-// GetAllSessions retrieves all active sessions
-// GET /api/v1/sessions?limit=100&offset=0
+// GetAllSessions returns all active sessions
+// GET /api/v1/sessions
 func (h *SessionHandler) GetAllSessions(c *gin.Context) {
-	limitStr := c.DefaultQuery("limit", "100")
-	offsetStr := c.DefaultQuery("offset", "0")
+	// Parse query parameters
+	limit := 100 // default
+	offset := 0  // default
 
-	limit, err := strconv.Atoi(limitStr)
-	if err != nil || limit <= 0 || limit > 1000 {
-		limit = 100
+	if l := c.Query("limit"); l != "" {
+		if parsedLimit, err := strconv.Atoi(l); err == nil && parsedLimit > 0 {
+			limit = parsedLimit
+		}
 	}
 
-	offset, err := strconv.Atoi(offsetStr)
-	if err != nil || offset < 0 {
-		offset = 0
+	if o := c.Query("offset"); o != "" {
+		if parsedOffset, err := strconv.Atoi(o); err == nil && parsedOffset >= 0 {
+			offset = parsedOffset
+		}
 	}
 
-	allSessions := h.sessionService.GetAllSessions()
+	sessions := h.sessionService.GetAllSessions()
 
 	// Apply pagination
-	total := len(allSessions)
+	start := offset
 	end := offset + limit
-	if end > total {
-		end = total
+	if start > len(sessions) {
+		start = len(sessions)
+	}
+	if end > len(sessions) {
+		end = len(sessions)
 	}
 
-	sessions := allSessions[offset:end]
+	paginatedSessions := sessions[start:end]
+
+	// Format response
+	response := make([]map[string]interface{}, len(paginatedSessions))
+	for i, session := range paginatedSessions {
+		response[i] = formatSessionForResponse(session)
+	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"sessions": sessions,
-		"total":    total,
+		"sessions": response,
+		"total":    len(sessions),
 		"limit":    limit,
 		"offset":   offset,
+	})
+}
+
+// GetSession returns a session by ID
+// GET /api/v1/session/:id
+func (h *SessionHandler) GetSession(c *gin.Context) {
+	id := c.Param("id")
+
+	// Try to find session by different identifiers
+	var session *models.IPTrafficSession
+
+	// First try as UUID
+	if len(id) == 36 && strings.Count(id, "-") == 4 {
+		// Looks like UUID, search in all sessions
+		sessions := h.sessionService.GetAllSessions()
+		for _, s := range sessions {
+			if s.UUID == id {
+				session = s
+				break
+			}
+		}
+	} else {
+		// Try as SID
+		session = h.sessionService.FindSessionBySID(id)
+		if session == nil {
+			// Try as IP
+			session = h.sessionService.FindSessionByIP(id)
+		}
+		if session == nil {
+			// Try as username
+			session = h.sessionService.FindSessionByUsername(id)
+		}
+	}
+
+	if session == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Session not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"session": formatSessionForResponse(session),
 	})
 }
 

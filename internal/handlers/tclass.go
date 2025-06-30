@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"netspire-go/internal/models"
-	"netspire-go/internal/services/tclass"
+	"isp-billing/internal/models"
+	"isp-billing/internal/services/tclass"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
