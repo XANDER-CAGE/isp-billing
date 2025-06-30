@@ -172,6 +172,20 @@ type ServiceParams struct {
 	Credit    float64 `db:"credit"`
 }
 
+// AccountWithSubscription - для обработки подписок
+type AccountWithSubscription struct {
+	ID        int       `db:"id"`
+	Login     string    `db:"login"`
+	PData     string    `db:"plan_data"`
+	PId       int       `db:"plan_id"`
+	CreatedAt time.Time `db:"created_at"`
+	Auth      string    `db:"auth_algo"`
+	Acct      string    `db:"acct_algo"`
+	Balance   float64   `db:"balance"`
+	Currency  int       `db:"currency_id"`
+	Credit    float64   `db:"credit"`
+}
+
 // ================ HELPER МЕТОДЫ ================
 
 // ParsePlanData - парсинг JSON из VARCHAR поля plan_data

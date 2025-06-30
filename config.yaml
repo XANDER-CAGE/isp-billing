@@ -164,6 +164,23 @@ traffic_classification:
       cost_in: 0.015
       cost_out: 0.018
 
+# Subscription Billing (автоматические списания абонентской платы)
+subscription:
+  enabled: true                           # Включить автоматические списания
+  default_monthly_fee: 25.0               # Абонентская плата по умолчанию
+  grace_period_days: 3                    # Льготный период при недостатке средств
+  disable_on_insufficient_funds: false    # Отключать аккаунт при недостатке средств
+  processing_time: "02:00"                # Время обработки списаний (2:00 AM)
+  enable_proration: true                  # Пропорциональное списание для новых аккаунтов
+  
+  # Планировщик автоматических списаний
+  scheduler:
+    enabled: true                         # Включить планировщик
+    run_on_first_day: true               # Запускать 1 числа каждого месяца
+    retry_failed: true                   # Повторять неудачные попытки
+    retry_interval_hours: 24             # Интервал повтора в часах
+    max_retries: 3                       # Максимум попыток
+
 # Logging
 logging:
   level: "info"
